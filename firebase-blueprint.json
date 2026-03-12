@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Track": {
+      "title": "Track",
+      "description": "Audio track metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "artist": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "duration": { "type": "number" },
+        "playbackRate": { "type": "number" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "audioUrl"]
+    },
+    "Timestamp": {
+      "title": "Timestamp",
+      "description": "Timestamp within a track",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trackId": { "type": "string" },
+        "userId": { "type": "string" },
+        "time": { "type": "number" },
+        "label": { "type": "string" }
+      },
+      "required": ["id", "trackId", "userId", "time", "label"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/tracks/{trackId}": {
+      "schema": "Track",
+      "description": "User's audio tracks"
+    },
+    "/users/{userId}/tracks/{trackId}/timestamps/{timestampId}": {
+      "schema": "Timestamp",
+      "description": "Timestamps for a specific track"
+    }
+  }
+}

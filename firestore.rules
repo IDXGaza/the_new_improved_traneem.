@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - photoURL: string
+    //   - createdAt: timestamp
+    //
+    // Collection: users/{userId}/tracks
+    // Document ID: {trackId}
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required)
+    //   - name: string (required)
+    //   - artist: string
+    //   - audioUrl: string (required)
+    //   - coverUrl: string
+    //   - coverStorageUrl: string
+    //   - isFavorite: bool
+    //   - duration: number
+    //   - playbackRate: number
+    //   - order: number
+    //   - timestamps: list of maps
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidTrack(data) {
+      return data.id is string &&
+             data.userId is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.audioUrl is string &&
+             (!('artist' in data) || data.artist is string) &&
+             (!('isFavorite' in data) || data.isFavorite is bool) &&
+             (!('duration' in data) || data.duration is number) &&
+             (!('playbackRate' in data) || data.playbackRate is number) &&
+             (!('order' in data) || data.order is number) &&
+             (!('timestamps' in data) || data.timestamps is list);
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      match /tracks/{trackId} {
+        allow read, write: if isOwner(userId) && (request.method == 'DELETE' || isValidTrack(request.resource.data));
+      }
+    }
+  }
+}
