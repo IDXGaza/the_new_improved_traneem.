@@ -29,7 +29,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       onClose();
     } catch (err: any) {
       console.error("Auth error:", err);
-      let msg = "حدث خطأ أثناء المصادقة.";
+      let msg = `حدث خطأ أثناء المصادقة: ${err.message || err.code || 'خطأ غير معروف'}`;
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
         msg = "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
       } else if (err.code === 'auth/email-already-in-use') {
