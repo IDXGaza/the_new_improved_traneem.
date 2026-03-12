@@ -4,7 +4,8 @@ import { Track, Timestamp, PlayerState } from './types';
 import Sidebar from './components/Sidebar';
 import Player from './components/Player';
 import TimestampManager from './components/TimestampManager';
-import { auth, db, storage, loginWithGoogle, logout } from './firebase';
+import AuthModal from './components/AuthModal';
+import { auth, db, storage, logout } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -111,6 +112,7 @@ const App: React.FC = () => {
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -172,32 +174,7 @@ const App: React.FC = () => {
   };
 
   const handleLogin = async () => {
-    console.log("Login button clicked");
-    
-    // Check if config is still placeholder
-    if (isConfigPlaceholder()) {
-      const proceed = window.confirm("تنبيه: لم يتم ضبط إعدادات Firebase الحقيقية في قائمة Settings. هل تريد المحاولة على أي حال؟ (قد يفشل تسجيل الدخول)");
-      if (!proceed) return;
-    }
-    
-    try {
-      console.log("Calling loginWithGoogle...");
-      await loginWithGoogle();
-      console.log("loginWithGoogle call finished");
-    } catch (error: any) {
-      console.error("Login detailed error:", error);
-      let errorMessage = "فشل تسجيل الدخول: " + (error.message || "خطأ غير معروف");
-      
-      if (error.code === 'auth/popup-blocked') {
-        errorMessage = "تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع لتتمكن من تسجيل الدخول.";
-      } else if (error.code === 'auth/operation-not-allowed') {
-        errorMessage = "تسجيل الدخول عبر قوقل غير مفعل في مشروع Firebase الخاص بك.";
-      } else if (error.code === 'auth/invalid-api-key') {
-        errorMessage = "مفتاح API الخاص بـ Firebase غير صالح. يرجى التحقق من الإعدادات.";
-      }
-      
-      alert(errorMessage);
-    }
+    setIsAuthModalOpen(true);
   };
 
   const syncLocalToCloud = async (currentUser: User) => {
@@ -730,7 +707,7 @@ const App: React.FC = () => {
                 ) : (
                   <button onClick={() => { handleLogin(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-[#4da8ab] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-2.21 5.39-7.84 5.39-4.84 0-8.79-4.01-8.79-8.94s3.95-8.94 8.79-8.94c2.75 0 4.59 1.17 5.65 2.18l2.59-2.49C19.06 1.05 16.03 0 12.48 0 5.86 0 .5 5.36.5 12s5.36 12 11.98 12c6.91 0 11.5-4.86 11.5-11.7 0-.79-.08-1.39-.18-1.98H12.48z"/></svg>
-                    تسجيل الدخول (Google)
+                    تسجيل الدخول
                   </button>
                 )}
                 
@@ -752,6 +729,7 @@ const App: React.FC = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
+        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
         <Sidebar 
           onImport={addTrack} onRemove={removeTrack} onMove={handleMoveTrack}
           tracks={tracks} currentId={currentTrack?.id || null} onSelect={handleSelectTrack}
