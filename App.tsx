@@ -4,40 +4,8 @@ import { Track, Timestamp, PlayerState } from './types';
 import Sidebar from './components/Sidebar';
 import Player from './components/Player';
 import TimestampManager from './components/TimestampManager';
-import AuthModal from './components/AuthModal';
-import { auth, db, logout } from './firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, getDocs, writeBatch } from 'firebase/firestore';
-import firebaseConfig from './firebase-applet-config.json';
-
-const CLOUDINARY_CLOUD_NAME = "dt59bwxwc";
-const CLOUDINARY_UPLOAD_PRESET = "s4ipx1wf";
-
-const uploadToCloudinary = async (file: File | Blob): Promise<string> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-  
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, {
-    method: 'POST',
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error?.message || 'Failed to upload to Cloudinary');
-  }
-  
-  const data = await response.json();
-  return data.secure_url;
-};
 
 const UNIFORM_PLACEHOLDER = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&h=600&auto=format&fit=crop";
-
-const isConfigPlaceholder = () => {
-  return firebaseConfig.projectId === 'remixed-project-id' || 
-         firebaseConfig.apiKey === 'remixed-api-key';
-};
 
 const DB_NAME = 'TraneemDB';
 const STORE_NAME = 'tracks';
@@ -128,14 +96,11 @@ const getAllTracksFromDB = async (): Promise<any[]> => {
 };
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState>({
     isPlaying: false,
@@ -194,120 +159,24 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = async () => {
-    setIsAuthModalOpen(true);
-  };
-
-  const syncLocalToCloud = async (currentUser: User) => {
-    setIsSyncing(true);
-    let hasError = false;
-    try {
-      const localTracks = await getAllTracksFromDB();
-      for (const track of localTracks) {
-        // Only sync if not already synced
-        if (!track.audioUrl && track.fileBlob) {
-          try {
-            const id = track.id;
-            const audioUrl = await uploadToCloudinary(track.fileBlob);
-            
-            let coverStorageUrl = track.coverStorageUrl;
-            if (track.coverBlob) {
-              coverStorageUrl = await uploadToCloudinary(track.coverBlob);
-            }
-
-            const { fileBlob, coverBlob, ...metadata } = track;
-            const cloudTrack = { ...metadata, audioUrl, coverStorageUrl, userId: currentUser.uid };
-            await setDoc(doc(db, `users/${currentUser.uid}/tracks`, id), cloudTrack);
-            
-            // Update local DB to mark as synced
-            await saveTrackToDB({ ...track, audioUrl, coverStorageUrl });
-          } catch (err) {
-            console.error("Failed to sync track:", track.name, err);
-            hasError = true;
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Auto-sync error:", error);
-      hasError = true;
-    } finally {
-      setIsSyncing(false);
-      if (hasError) {
-        alert("حدث خطأ أثناء رفع بعض الأناشيد للسحابة. تأكد من اتصالك بالإنترنت وأن حجم الملف ليس كبيراً جداً.");
-      }
-    }
-  };
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u) {
-        syncLocalToCloud(u);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      // Load from local DB if not logged in
-      const loadLocalData = async () => {
-        try {
-          const savedTracks = await getAllTracksFromDB();
-          const sortedTracks = savedTracks.sort((a, b) => (a.order || 0) - (b.order || 0));
-          const tracksWithUrls = sortedTracks.map(t => ({
-            ...t,
-            url: t.fileBlob ? URL.createObjectURL(t.fileBlob) : (t.audioUrl || ""),
-            coverUrl: t.coverBlob ? URL.createObjectURL(t.coverBlob) : (t.coverUrl || UNIFORM_PLACEHOLDER)
-          }));
-          setTracks(tracksWithUrls);
-          if (tracksWithUrls.length > 0) setCurrentTrackIndex(0);
-        } catch (e) {
-          console.error("Failed to load tracks from DB", e);
-        }
-      };
-      loadLocalData();
-      return;
-    }
-
-    // Load from Firestore if logged in
-    const q = query(collection(db, `users/${user.uid}/tracks`), orderBy('order'));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const cloudTracks = snapshot.docs.map(doc => {
-        const data = doc.data() as Track;
-        return {
-          ...data,
-          url: data.audioUrl || "", // Use cloud URL
-          coverUrl: data.coverStorageUrl || data.coverUrl || UNIFORM_PLACEHOLDER
-        };
-      });
-
-      // Also get local tracks that might not be synced yet
+    const loadLocalData = async () => {
       try {
-        const localTracks = await getAllTracksFromDB();
-        const localUnsynced = localTracks.filter(lt => !cloudTracks.find(ct => ct.id === lt.id));
-        
-        const mergedTracks = [...cloudTracks, ...localUnsynced.map(t => ({
+        const savedTracks = await getAllTracksFromDB();
+        const sortedTracks = savedTracks.sort((a, b) => (a.order || 0) - (b.order || 0));
+        const tracksWithUrls = sortedTracks.map(t => ({
           ...t,
           url: t.fileBlob ? URL.createObjectURL(t.fileBlob) : (t.audioUrl || ""),
           coverUrl: t.coverBlob ? URL.createObjectURL(t.coverBlob) : (t.coverUrl || UNIFORM_PLACEHOLDER)
-        }))].sort((a, b) => (a.order || 0) - (b.order || 0));
-
-        setTracks(mergedTracks);
-        if (mergedTracks.length > 0 && currentTrackIndex === null) setCurrentTrackIndex(0);
+        }));
+        setTracks(tracksWithUrls);
+        if (tracksWithUrls.length > 0) setCurrentTrackIndex(0);
       } catch (e) {
-        console.error("Failed to merge local tracks", e);
-        setTracks(cloudTracks);
-        if (cloudTracks.length > 0 && currentTrackIndex === null) setCurrentTrackIndex(0);
+        console.error("Failed to load tracks from DB", e);
       }
-    }, (error) => {
-      console.error("Firestore sync error:", error);
-    });
-
-    return () => {
-      unsubscribe();
     };
-  }, [user]);
+    loadLocalData();
+  }, []);
 
   const handleSelectTrack = (index: number) => {
     setCurrentTrackIndex(index);
@@ -478,12 +347,6 @@ const App: React.FC = () => {
     const updatedTrack = { ...currentTrack, isFavorite: !currentTrack.isFavorite };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
-    if (user) {
-      const { fileBlob, coverBlob, ...metadata } = updatedTrack;
-      setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
-        console.error("Firestore update error:", e);
-      });
-    }
   };
 
   const handleUpdateName = (e: React.MouseEvent) => {
@@ -494,12 +357,6 @@ const App: React.FC = () => {
       const updatedTrack = { ...currentTrack, name: newName.trim() };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
       saveTrackToDB(updatedTrack).catch(() => {});
-      if (user) {
-        const { fileBlob, coverBlob, ...metadata } = updatedTrack;
-        setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
-          console.error("Firestore update error:", e);
-        });
-      }
     }
   };
 
@@ -511,44 +368,19 @@ const App: React.FC = () => {
       const updatedTrack = { ...currentTrack, artist: newArtist.trim() };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
       saveTrackToDB(updatedTrack).catch(() => {});
-      if (user) {
-        const { fileBlob, coverBlob, ...metadata } = updatedTrack;
-        setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
-          console.error("Firestore update error:", e);
-        });
-      }
     }
   };
 
   const handleUpdateCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && currentTrack) {
-      let coverStorageUrl = currentTrack.coverStorageUrl;
-      if (user) {
-        setIsSyncing(true);
-        try {
-          coverStorageUrl = await uploadToCloudinary(file);
-        } catch (error) {
-          console.error("Failed to upload cover to cloud:", error);
-        } finally {
-          setIsSyncing(false);
-        }
-      }
-
       const updatedTrack = { 
         ...currentTrack, 
         coverUrl: URL.createObjectURL(file), 
-        coverBlob: file,
-        coverStorageUrl
+        coverBlob: file
       };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
       saveTrackToDB(updatedTrack).catch(() => {});
-      if (user) {
-        const { fileBlob, coverBlob, ...metadata } = updatedTrack;
-        setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
-          console.error("Firestore update error:", e);
-        });
-      }
     }
   };
 
@@ -562,12 +394,6 @@ const App: React.FC = () => {
     const updatedTrack = { ...currentTrack, timestamps: [...currentTrack.timestamps, newTimestamp] };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
-    if (user) {
-      const { fileBlob, coverBlob, ...metadata } = updatedTrack;
-      setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
-        console.error("Firestore update error:", e);
-      });
-    }
   };
 
   const handleRemoveTimestamp = (timestampId: string) => {
@@ -575,12 +401,6 @@ const App: React.FC = () => {
     const updatedTrack = { ...currentTrack, timestamps: currentTrack.timestamps.filter(ts => ts.id !== timestampId) };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
-    if (user) {
-      const { fileBlob, coverBlob, ...metadata } = updatedTrack;
-      setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
-        console.error("Firestore update error:", e);
-      });
-    }
   };
 
   const addTrack = async (file: File) => {
@@ -606,29 +426,6 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Failed to save track to local DB:", error);
     }
-
-    // Save to Cloud if logged in
-    if (user) {
-      setIsSyncing(true);
-      try {
-        const audioUrl = await uploadToCloudinary(file);
-        
-        const cloudTrack = { ...newTrack, audioUrl, userId: user.uid };
-        // Remove blobs before saving to Firestore
-        const { fileBlob, coverBlob, ...metadata } = cloudTrack;
-        await setDoc(doc(db, `users/${user.uid}/tracks`, id), metadata);
-        
-        // Update local DB with the new audioUrl so it doesn't try to sync again
-        await saveTrackToDB({ ...newTrack, audioUrl });
-      } catch (error) {
-        console.error("Failed to sync track to cloud:", error);
-        alert("فشل رفع الأنشودة للسحابة. سيتم حفظها في جهازك فقط. تأكد من اتصالك بالإنترنت.");
-      } finally {
-        setIsSyncing(false);
-      }
-    } else {
-      alert("أنت غير مسجل الدخول! تم حفظ الأنشودة في جهازك فقط، ولن تكون موجودة إذا حذفت التطبيق.");
-    }
   };
 
   const removeTrack = async (id: string) => {
@@ -636,16 +433,6 @@ const App: React.FC = () => {
       await deleteTrackFromDB(id);
     } catch (error) {
       console.error("Failed to delete track from local DB:", error);
-    }
-
-    if (user) {
-      try {
-        await deleteDoc(doc(db, `users/${user.uid}/tracks`, id));
-        // Note: Cloudinary unsigned uploads cannot be easily deleted from the client.
-        // We just remove the reference from Firestore.
-      } catch (error) {
-        console.error("Failed to delete track from cloud:", error);
-      }
     }
 
     setTracks(prev => {
@@ -668,10 +455,6 @@ const App: React.FC = () => {
     try {
       for (const track of updatedTracks) {
         await saveTrackToDB(track);
-        if (user) {
-          const { fileBlob, coverBlob, ...metadata } = track;
-          await setDoc(doc(db, `users/${user.uid}/tracks`, track.id), { ...metadata, userId: user.uid });
-        }
       }
     } catch (error) {
       console.error("Failed to save reordered tracks:", error);
@@ -777,49 +560,19 @@ const App: React.FC = () => {
         <h1 className="text-xl md:text-2xl font-black text-[#4da8ab] absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">ترانيم</h1>
 
         <div className="relative flex items-center gap-3">
-          {isSyncing && (
-            <div className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full animate-pulse">
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              <span className="text-[10px] font-bold hidden sm:inline">جاري المزامنة...</span>
-            </div>
-          )}
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
             className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors border-2 border-transparent hover:border-slate-200 dark:hover:border-slate-800"
           >
-            {user ? (
-              <img src={user.photoURL || ""} className="w-8 h-8 rounded-full object-cover" alt="User" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-              </div>
-            )}
+            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            </div>
           </button>
 
           {isDropdownOpen && (
             <>
               <div className="fixed inset-0 z-[110]" onClick={() => setIsDropdownOpen(false)} />
               <div className="absolute left-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 z-[120] overflow-hidden flex flex-col py-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                {user ? (
-                  <>
-                    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{user.displayName}</p>
-                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                      {isSyncing && <p className="text-[10px] text-amber-500 mt-1 animate-pulse font-bold">جاري المزامنة...</p>}
-                    </div>
-                    <button onClick={() => { logout(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-rose-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                      تسجيل الخروج
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={() => { handleLogin(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-[#4da8ab] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-2.21 5.39-7.84 5.39-4.84 0-8.79-4.01-8.79-8.94s3.95-8.94 8.79-8.94c2.75 0 4.59 1.17 5.65 2.18l2.59-2.49C19.06 1.05 16.03 0 12.48 0 5.86 0 .5 5.36.5 12s5.36 12 11.98 12c6.91 0 11.5-4.86 11.5-11.7 0-.79-.08-1.39-.18-1.98H12.48z"/></svg>
-                    تسجيل الدخول
-                  </button>
-                )}
-                
-                <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
-                
                 <button onClick={() => { toggleDarkMode(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
                   <span>{isDarkMode ? '☀️' : '🌙'}</span>
                   <span>{isDarkMode ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
@@ -836,7 +589,6 @@ const App: React.FC = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
         <Sidebar 
           onImport={addTrack} onRemove={removeTrack} onMove={handleMoveTrack}
           tracks={tracks} currentId={currentTrack?.id || null} onSelect={handleSelectTrack}

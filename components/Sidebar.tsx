@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { Track } from '../types';
-import { User } from 'firebase/auth';
 
 interface SidebarProps {
   onImport: (file: File) => void;
