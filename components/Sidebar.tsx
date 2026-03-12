@@ -28,6 +28,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         item.track.name.toLowerCase().includes(searchLower) ||
         (item.track.artist && item.track.artist.toLowerCase().includes(searchLower))
       );
+    })
+    .sort((a, b) => {
+      if (a.track.isFavorite && !b.track.isFavorite) return -1;
+      if (!a.track.isFavorite && b.track.isFavorite) return 1;
+      return a.originalIndex - b.originalIndex;
     });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +141,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <img src={item.track.coverUrl} className="w-10 h-10 rounded-xl object-cover shadow-sm" alt="" />
                     <div className="flex-1 min-w-0 text-right">
-                      <p className="truncate font-bold text-xs">{item.track.name}</p>
+                      <div className="flex items-center justify-start gap-1.5">
+                        <p className="truncate font-bold text-xs">{item.track.name}</p>
+                        {item.track.isFavorite && (
+                          <svg className="w-3 h-3 text-rose-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                        )}
+                      </div>
                       <p className="text-[9px] opacity-40 font-bold uppercase mt-1 truncate">
                         {item.track.artist || "ملف صوتي"}
                       </p>
