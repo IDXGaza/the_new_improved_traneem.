@@ -4,6 +4,10 @@ import { Track, Timestamp, PlayerState } from './types';
 import Sidebar from './components/Sidebar';
 import Player from './components/Player';
 import TimestampManager from './components/TimestampManager';
+import { auth, db, storage, googleProvider } from './src/firebase';
+import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { doc, setDoc, deleteDoc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const UNIFORM_PLACEHOLDER = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&h=600&auto=format&fit=crop";
 
@@ -96,6 +100,8 @@ const getAllTracksFromDB = async (): Promise<any[]> => {
 };
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -118,13 +124,50 @@ const App: React.FC = () => {
   const currentTrack = currentTrackIndex !== null ? tracks[currentTrackIndex] : null;
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        syncTracksFromCloud(currentUser.uid);
+      }
+    });
+    return () => unsubscribe();
   }, []);
+
+  const syncTracksFromCloud = async (uid: string) => {
+    setIsSyncing(true);
+    try {
+      const q = query(collection(db, `users/${uid}/tracks`), where("userId", "==", uid));
+      const querySnapshot = await getDocs(q);
+      const cloudTracks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Track));
+      
+      // Merge with local tracks
+      const localTracks = await getAllTracksFromDB();
+      const mergedTracks = [...localTracks];
+      cloudTracks.forEach(ct => {
+        if (!mergedTracks.find(lt => lt.id === ct.id)) {
+          mergedTracks.push(ct);
+        }
+      });
+      
+      setTracks(mergedTracks.sort((a, b) => (a.order || 0) - (b.order || 0)));
+    } catch (e) {
+      console.error("Sync error:", e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      console.error("Login error:", e);
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+  };
 
   const initAudioCtx = () => {
     if (audioCtxRef.current || !audioRef.current) {
@@ -347,6 +390,12 @@ const App: React.FC = () => {
     const updatedTrack = { ...currentTrack, isFavorite: !currentTrack.isFavorite };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
+    if (user) {
+      const { fileBlob, coverBlob, ...metadata } = updatedTrack;
+      setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
+        console.error("Firestore update error:", e);
+      });
+    }
   };
 
   const handleUpdateName = (e: React.MouseEvent) => {
@@ -357,6 +406,12 @@ const App: React.FC = () => {
       const updatedTrack = { ...currentTrack, name: newName.trim() };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
       saveTrackToDB(updatedTrack).catch(() => {});
+      if (user) {
+        const { fileBlob, coverBlob, ...metadata } = updatedTrack;
+        setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
+          console.error("Firestore update error:", e);
+        });
+      }
     }
   };
 
@@ -368,6 +423,12 @@ const App: React.FC = () => {
       const updatedTrack = { ...currentTrack, artist: newArtist.trim() };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
       saveTrackToDB(updatedTrack).catch(() => {});
+      if (user) {
+        const { fileBlob, coverBlob, ...metadata } = updatedTrack;
+        setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
+          console.error("Firestore update error:", e);
+        });
+      }
     }
   };
 
@@ -381,6 +442,12 @@ const App: React.FC = () => {
       };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
       saveTrackToDB(updatedTrack).catch(() => {});
+      if (user) {
+        const { fileBlob, coverBlob, ...metadata } = updatedTrack;
+        setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
+          console.error("Firestore update error:", e);
+        });
+      }
     }
   };
 
@@ -394,6 +461,12 @@ const App: React.FC = () => {
     const updatedTrack = { ...currentTrack, timestamps: [...currentTrack.timestamps, newTimestamp] };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
+    if (user) {
+      const { fileBlob, coverBlob, ...metadata } = updatedTrack;
+      setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
+        console.error("Firestore update error:", e);
+      });
+    }
   };
 
   const handleRemoveTimestamp = (timestampId: string) => {
@@ -401,6 +474,12 @@ const App: React.FC = () => {
     const updatedTrack = { ...currentTrack, timestamps: currentTrack.timestamps.filter(ts => ts.id !== timestampId) };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
+    if (user) {
+      const { fileBlob, coverBlob, ...metadata } = updatedTrack;
+      setDoc(doc(db, `users/${user.uid}/tracks`, currentTrack.id), { ...metadata, userId: user.uid }).catch((e) => {
+        console.error("Firestore update error:", e);
+      });
+    }
   };
 
   const addTrack = async (file: File) => {
@@ -426,6 +505,28 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Failed to save track to local DB:", error);
     }
+
+    // Save to Cloud if logged in
+    if (user) {
+      setIsSyncing(true);
+      try {
+        const storageRef = ref(storage, `users/${user.uid}/tracks/${id}/${file.name}`);
+        await uploadBytes(storageRef, file);
+        const audioUrl = await getDownloadURL(storageRef);
+        
+        const cloudTrack = { ...newTrack, audioUrl, userId: user.uid };
+        // Remove blobs before saving to Firestore
+        const { fileBlob, coverBlob, ...metadata } = cloudTrack;
+        await setDoc(doc(db, `users/${user.uid}/tracks`, id), metadata);
+        
+        // Update local DB with the new audioUrl so it doesn't try to sync again
+        await saveTrackToDB({ ...newTrack, audioUrl });
+      } catch (error) {
+        console.error("Failed to sync track to cloud:", error);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   const removeTrack = async (id: string) => {
@@ -433,6 +534,14 @@ const App: React.FC = () => {
       await deleteTrackFromDB(id);
     } catch (error) {
       console.error("Failed to delete track from local DB:", error);
+    }
+
+    if (user) {
+      try {
+        await deleteDoc(doc(db, `users/${user.uid}/tracks`, id));
+      } catch (error) {
+        console.error("Failed to delete track from cloud:", error);
+      }
     }
 
     setTracks(prev => {
@@ -455,6 +564,10 @@ const App: React.FC = () => {
     try {
       for (const track of updatedTracks) {
         await saveTrackToDB(track);
+        if (user) {
+          const { fileBlob, coverBlob, ...metadata } = track;
+          await setDoc(doc(db, `users/${user.uid}/tracks`, track.id), { ...metadata, userId: user.uid });
+        }
       }
     } catch (error) {
       console.error("Failed to save reordered tracks:", error);
@@ -560,19 +673,49 @@ const App: React.FC = () => {
         <h1 className="text-xl md:text-2xl font-black text-[#4da8ab] absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">ترانيم</h1>
 
         <div className="relative flex items-center gap-3">
+          {isSyncing && (
+            <div className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full animate-pulse">
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <span className="text-[10px] font-bold hidden sm:inline">جاري المزامنة...</span>
+            </div>
+          )}
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
             className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors border-2 border-transparent hover:border-slate-200 dark:hover:border-slate-800"
           >
-            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-            </div>
+            {user ? (
+              <img src={user.photoURL || ""} className="w-8 h-8 rounded-full object-cover" alt="User" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+              </div>
+            )}
           </button>
 
           {isDropdownOpen && (
             <>
               <div className="fixed inset-0 z-[110]" onClick={() => setIsDropdownOpen(false)} />
               <div className="absolute left-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 z-[120] overflow-hidden flex flex-col py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                {user ? (
+                  <>
+                    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{user.displayName}</p>
+                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                      {isSyncing && <p className="text-[10px] text-amber-500 mt-1 animate-pulse font-bold">جاري المزامنة...</p>}
+                    </div>
+                    <button onClick={() => { logout(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-rose-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      تسجيل الخروج
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => { handleLogin(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-[#4da8ab] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-2.21 5.39-7.84 5.39-4.84 0-8.79-4.01-8.79-8.94s3.95-8.94 8.79-8.94c2.75 0 4.59 1.17 5.65 2.18l2.59-2.49C19.06 1.05 16.03 0 12.48 0 5.86 0 .5 5.36.5 12s5.36 12 11.98 12c6.91 0 11.5-4.86 11.5-11.7 0-.79-.08-1.39-.18-1.98H12.48z"/></svg>
+                    تسجيل الدخول
+                  </button>
+                )}
+                
+                <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+                
                 <button onClick={() => { toggleDarkMode(); setIsDropdownOpen(false); }} className="w-full text-right px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2">
                   <span>{isDarkMode ? '☀️' : '🌙'}</span>
                   <span>{isDarkMode ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>

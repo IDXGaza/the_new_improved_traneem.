@@ -141,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <img src={item.track.coverUrl} className="w-10 h-10 rounded-xl object-cover shadow-sm" alt="" />
                     <div className="flex-1 min-w-0 text-right">
                       <div className="flex items-center justify-start gap-1.5">
-                        <p className="truncate font-bold text-xs">{item.track.name}</p>
+                        <p className="truncate font-bold text-xs w-32">{item.track.name}</p>
                         {item.track.isFavorite && (
                           <svg className="w-3 h-3 text-rose-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
                         )}
@@ -154,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   
                   <button 
                     onClick={(e) => { e.stopPropagation(); onRemove(item.track.id); }} 
-                    className="p-2.5 text-rose-400 hover:text-rose-600 dark:text-rose-500/70 dark:hover:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 rounded-full transition-all active:scale-90 ml-1"
+                    className="p-2.5 text-slate-400 hover:text-slate-600 dark:text-slate-500/70 dark:hover:text-slate-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-500/10 dark:hover:bg-slate-500/20 rounded-full transition-all active:scale-90 ml-1"
                     title="حذف الأنشودة"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
