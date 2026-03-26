@@ -140,8 +140,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <img src={item.track.coverUrl} className="w-10 h-10 rounded-xl object-cover shadow-sm" alt="" />
                     <div className="flex-1 min-w-0 text-right">
-                      <div className="flex items-center justify-start gap-1.5">
-                        <p className="truncate font-bold text-xs w-32">{item.track.name}</p>
+                      <div className="flex items-center justify-start gap-1.5 w-full">
+                        <p className="truncate font-bold text-xs flex-1 text-right">{item.track.name}</p>
                         {item.track.isFavorite && (
                           <svg className="w-3 h-3 text-rose-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
                         )}
