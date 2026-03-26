@@ -136,19 +136,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                   <button 
                     onClick={() => { onSelect(item.originalIndex); if (onClose) onClose(); }}
-                    className={`flex-1 flex items-center gap-4 p-4 rounded-[20px] transition-all duration-300 ${currentId === item.track.id ? 'bg-[#4da8ab]/10 text-[#4da8ab] shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400'}`}
+                    className={`flex-1 flex items-center gap-3 p-3 rounded-[20px] transition-all duration-300 min-w-0 ${currentId === item.track.id ? 'bg-[#4da8ab]/10 text-[#4da8ab] shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400'}`}
                   >
-                    <img src={item.track.coverUrl} className="w-10 h-10 rounded-xl object-cover shadow-sm" alt="" />
+                    {item.track.isFavorite && (
+                      <svg className="w-4 h-4 text-rose-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                    )}
+                    <img src={item.track.coverUrl} className="w-10 h-10 rounded-xl object-cover shadow-sm shrink-0" alt="" />
                     <div className="flex-1 min-w-0 text-right">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <p className="font-bold text-xs flex-1 text-right whitespace-nowrap" dir="rtl">
-                          {item.track.name.length > 20 ? item.track.name.substring(0, 20) + '...' : item.track.name}
-                        </p>
-                        {item.track.isFavorite && (
-                          <svg className="w-3 h-3 text-rose-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-                        )}
-                      </div>
-                      <p className="text-[9px] opacity-40 font-bold uppercase mt-1 truncate">
+                      <p className="font-bold text-xs truncate" dir="rtl" title={item.track.name}>
+                        {item.track.name}
+                      </p>
+                      <p className="text-[10px] opacity-50 font-bold mt-1 truncate" title={item.track.artist || "ملف صوتي"}>
                         {item.track.artist || "ملف صوتي"}
                       </p>
                     </div>
@@ -156,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   
                   <button 
                     onClick={(e) => { e.stopPropagation(); onRemove(item.track.id); }} 
-                    className="p-2.5 text-slate-400 hover:text-slate-600 dark:text-slate-500/70 dark:hover:text-slate-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-500/10 dark:hover:bg-slate-500/20 rounded-full transition-all active:scale-90 ml-1"
+                    className="p-2.5 text-slate-400 hover:text-slate-600 dark:text-slate-500/70 dark:hover:text-slate-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-500/10 dark:hover:bg-slate-500/20 rounded-full transition-all active:scale-90 ml-1 shrink-0"
                     title="حذف الأنشودة"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
