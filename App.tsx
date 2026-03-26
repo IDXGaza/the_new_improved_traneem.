@@ -147,7 +147,7 @@ const App: React.FC = () => {
       zip.file('metadata.json', JSON.stringify(metadataList));
       
       const content = await zip.generateAsync({ type: 'blob' });
-      const fileName = `traneem_backup_${new Date().toISOString().split('T')[0]}.zip`;
+      const fileName = `traneem_backup.zip`;
       const file = new File([content], fileName, { type: 'application/zip' });
 
       const fallbackDownload = () => {
