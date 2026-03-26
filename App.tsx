@@ -147,14 +147,53 @@ const App: React.FC = () => {
       zip.file('metadata.json', JSON.stringify(metadataList));
       
       const content = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(content);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `traneem_backup_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const fileName = `traneem_backup_${new Date().toISOString().split('T')[0]}.zip`;
+      const file = new File([content], fileName, { type: 'application/zip' });
+
+      const fallbackDownload = () => {
+        const isLikelyWebView = /wv|Mobile|Android|iPhone/i.test(navigator.userAgent);
+        
+        if (isLikelyWebView && content.size < 15 * 1024 * 1024) {
+          // Use Data URL for WebViews if file is small enough (< 15MB)
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const a = document.createElement('a');
+            a.href = reader.result as string;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+          reader.readAsDataURL(content);
+        } else {
+          // Standard Blob download
+          const url = URL.createObjectURL(content);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+      };
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'نسخة احتياطية - ترانيم',
+          });
+        } catch (shareError: any) {
+          if (shareError.name !== 'AbortError') {
+            fallbackDownload();
+          }
+        }
+      } else {
+        // For WebViews that don't support share but might support data URLs
+        // We try blob first, if it fails, it fails silently in WebViews without DownloadListener
+        fallbackDownload();
+      }
     } catch (error) {
       console.error("Backup creation failed:", error);
       alert("حدث خطأ أثناء إنشاء النسخة الاحتياطية");
@@ -290,7 +329,13 @@ const App: React.FC = () => {
       setPlayerState(prev => ({ ...prev, isPlaying: false }));
     } else {
       const playPromise = audio.play();
-      if (playPromise !== undefined) playPromise.catch(error => console.error(error));
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          if (error.name !== 'NotAllowedError') {
+            console.error(error);
+          }
+        });
+      }
       setPlayerState(prev => ({ ...prev, isPlaying: true }));
     }
   };
@@ -300,6 +345,22 @@ const App: React.FC = () => {
     if (audio) {
       audio.currentTime = time;
       setPlayerState(prev => ({ ...prev, currentTime: time }));
+    }
+  };
+
+  const handleTimestampSeek = (time: number) => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.currentTime = time;
+      setPlayerState(prev => ({ ...prev, currentTime: time, isPlaying: true }));
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          if (error.name !== 'NotAllowedError') {
+            console.error(error);
+          }
+        });
+      }
     }
   };
 
@@ -742,7 +803,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="w-full max-w-2xl px-2">
-                  <TimestampManager timestamps={currentTrack.timestamps} onRemove={handleRemoveTimestamp} onSeek={handleSeek} currentTime={playerState.currentTime} />
+                  <TimestampManager timestamps={currentTrack.timestamps} onRemove={handleRemoveTimestamp} onSeek={handleTimestampSeek} currentTime={playerState.currentTime} />
                 </div>
                 <div className="h-64 md:h-80 shrink-0 w-full" aria-hidden="true" />
               </div>
