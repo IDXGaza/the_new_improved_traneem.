@@ -42,10 +42,6 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: traneem-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          ./gradlew assembleDebug -Pandroid.suppressUnsupportedCompileSdk=34 --warning-mode all
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
