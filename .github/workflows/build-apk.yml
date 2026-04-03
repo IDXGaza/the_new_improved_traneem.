@@ -31,6 +31,7 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap add android || true
+          echo "configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10' } }" >> android/build.gradle
 
       - name: Build web app
         run: npm run build
@@ -42,6 +43,12 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug -Pandroid.suppressUnsupportedCompileSdk=34 --warning-mode all
+          ./gradlew assembleDebug --warning-mode all
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: traneem-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
