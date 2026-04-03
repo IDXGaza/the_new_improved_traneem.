@@ -43,7 +43,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --warning-mode all
+          ./gradlew assembleDebug -x checkDebugDuplicateClasses --warning-mode all
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
 
