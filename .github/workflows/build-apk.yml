@@ -30,6 +30,7 @@ jobs:
       - name: Add Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
+          rm -rf android
           npx cap add android
       - name: Build web app
         run: npm run build
