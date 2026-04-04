@@ -215,7 +215,6 @@ const handleCreateBackup = async () => {
         }
         metadataList.push(trackMeta);
 
-        // منع التعليق مع الملفات الكبيرة
         if (i % 20 === 0 && i > 0) {
           await new Promise(resolve => setTimeout(resolve, 50));
         }
@@ -227,7 +226,7 @@ const handleCreateBackup = async () => {
       const content = await zip.generateAsync({ 
         type: 'blob',
         compression: 'DEFLATE',
-        compressionOptions: { level: 1 }, // سرعة أعلى
+        compressionOptions: { level: 1 },
         streamFiles: true,
         mimeType: 'application/zip',
       });
@@ -236,10 +235,8 @@ const handleCreateBackup = async () => {
       console.log(`✅ تم إنشاء ZIP، الحجم: ${sizeMB} MB`);    
       const fileName = `traneem_backup_${Date.now()}.zip`;
 
-      // ✅ حفظ الملف في ذاكرة التطبيق (مسموح دائماً في أندرويد)
       console.log('💾 حفظ الملف في ذاكرة التطبيق...');
       
-      // تحويل Blob إلى Base64 لـ Capacitor
       const base64Data = await blobToBase64(content);
       
       await Filesystem.writeFile({
@@ -248,7 +245,6 @@ const handleCreateBackup = async () => {
         directory: Directory.Data,
       });
 
-      // الحصول على رابط الملف
       const fileUri = await Filesystem.getUri({
         path: fileName,
         directory: Directory.Data,
@@ -256,18 +252,17 @@ const handleCreateBackup = async () => {
 
       console.log('📤 فتح قائمة المشاركة...');
       
-      // فتح قائمة المشاركة في أندرويد
       await Share.share({
         files: [fileUri],
         title: 'نسخة احتياطية - ترانيم',
         text: `نسخة احتياطية (${sizeMB} MB) تحتوي على ${allTracks.length} أنشودة`,
       });
 
-      alert(`✅ تم إنشاء النسخة بنجاح!\n\n📁 من قائمة المشاركة، اختر:\n• حفظ في الملفات (Save to Files)\n• أو أرسلها لنفسك على تيليجرام/واتساب\n• أو Google Drive`);
+      alert(`✅ تم إنشاء النسخة بنجاح!\n\n📁 من قائمة المشاركة، اختر:\n• حفظ في الملفات\n• أو أرسلها لنفسك على تيليجرام/واتساب\n• أو Google Drive`);
 
     } catch (error: any) {
       console.error("❌ فشل إنشاء النسخة:", error);
-      alert(`❌ حدث خطأ أثناء إنشاء النسخة:\n${error.message}\n\nراجع Console للمزيد من التفاصيل`);
+      alert(`❌ حدث خطأ أثناء إنشاء النسخة:\n${error.message}`);
     } finally {
       setIsProcessingBackup(false);
       setIsDropdownOpen(false);
