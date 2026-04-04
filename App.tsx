@@ -4,7 +4,8 @@ import Sidebar from './components/Sidebar';
 import Player from './components/Player';
 import TimestampManager from './components/TimestampManager';
 import JSZip from 'jszip';
-
+import { Share } from '@capacitor/share';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 const UNIFORM_PLACEHOLDER = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&h=600&auto=format&fit=crop";
 
 const DB_NAME = 'TraneemDB';
