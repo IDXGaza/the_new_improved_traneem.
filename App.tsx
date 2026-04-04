@@ -1,7 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import JSZip from 'jszip';
-// @ts-ignore
-import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Track, PlayerState } from './types';
 import Sidebar from './components/Sidebar';
 import Player from './components/Player';
@@ -26,23 +24,26 @@ const App: React.FC = () => {
     try {
       setIsProcessingBackup(true);
       const zip = new JSZip();
-      const content = await zip.generateAsync({ type: 'blob' });
-      const fileName = `backup_${Date.now()}.zip`;
       
-      try {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve) => {
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-          reader.readAsDataURL(content);
-        });
-        await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Documents });
-        alert('تم حفظ النسخة الاحتياطية');
-      } catch (e) {
-        const url = URL.createObjectURL(content);
-        const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
-      }
+      // إضافة الملفات للنسخة الاحتياطية
+      tracks.forEach(track => {
+        if (track.fileBlob) {
+          zip.file(`audio/${track.name}.mp3`, track.fileBlob);
+        }
+      });
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      
+      // تحميل الملف في المتصفح
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `traneem_backup_${new Date().getTime()}.zip`;
+      link.click();
+      
+      URL.revokeObjectURL(url);
     } catch (err) {
-      alert('خطأ في إنشاء النسخة');
+      alert('فشل إنشاء النسخة الاحتياطية');
     } finally {
       setIsProcessingBackup(false);
     }
@@ -62,25 +63,29 @@ const App: React.FC = () => {
       order: tracks.length,
       fileBlob: file
     };
-    setTracks([...tracks, newTrack]);
+    setTracks(prev => [...prev, newTrack]);
   };
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
       <Sidebar 
-        isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}
-        tracks={tracks} onSelectTrack={(i) => setCurrentTrackIndex(i)}
-        onAddTrack={addTrack} isDarkMode={isDarkMode}
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)}
+        tracks={tracks} 
+        onSelectTrack={(i) => setCurrentTrackIndex(i)}
+        onAddTrack={addTrack} 
+        isDarkMode={isDarkMode}
         toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        handleCreateBackup={handleCreateBackup} isProcessingBackup={isProcessingBackup}
+        handleCreateBackup={handleCreateBackup} 
+        isProcessingBackup={isProcessingBackup}
       />
       
       <main className="p-4 max-w-4xl mx-auto">
-        <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-2xl">☰</button>
+        <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-2xl" aria-label="Open Sidebar">☰</button>
         {currentTrack && (
-          <div className="text-center mt-10">
-            <img src={currentTrack.coverUrl} className="w-64 h-64 mx-auto rounded-2xl shadow-xl mb-6" />
-            <h2 className="text-3xl font-bold">{currentTrack.name}</h2>
+          <div className="text-center mt-10 animate-fade-in">
+            <img src={currentTrack.coverUrl} className="w-64 h-64 mx-auto rounded-2xl shadow-xl mb-6 object-cover" alt="Cover" />
+            <h2 className="text-3xl font-bold mb-2">{currentTrack.name}</h2>
             <TimestampManager 
               timestamps={currentTrack.timestamps} 
               currentTime={playerState.currentTime}
@@ -92,7 +97,8 @@ const App: React.FC = () => {
 
       {currentTrack && (
         <Player 
-          track={currentTrack} isPlaying={playerState.isPlaying}
+          track={currentTrack} 
+          isPlaying={playerState.isPlaying}
           currentTime={playerState.currentTime}
           onPlayPause={() => playerState.isPlaying ? audioRef.current?.pause() : audioRef.current?.play()}
           onSeek={(t) => { if(audioRef.current) audioRef.current.currentTime = t; }}
@@ -100,7 +106,8 @@ const App: React.FC = () => {
       )}
 
       <audio 
-        ref={audioRef} src={currentTrack?.url}
+        ref={audioRef} 
+        src={currentTrack?.url}
         onTimeUpdate={() => setPlayerState(prev => ({...prev, currentTime: audioRef.current?.currentTime || 0}))}
         onPlay={() => setPlayerState(prev => ({...prev, isPlaying: true}))}
         onPause={() => setPlayerState(prev => ({...prev, isPlaying: false}))}
@@ -109,5 +116,5 @@ const App: React.FC = () => {
   );
 };
 
-export default App; // تأكد أن هذا السطر موجود في النهاية
+export default App;
     
