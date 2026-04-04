@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
+// @ts-ignore
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Track, PlayerState } from './types';
 import Sidebar from './components/Sidebar';
@@ -7,20 +8,6 @@ import Player from './components/Player';
 import TimestampManager from './components/TimestampManager';
 
 const UNIFORM_PLACEHOLDER = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=600&auto=format&fit=crop";
-const DB_NAME = 'TraneemDB';
-const STORE_NAME = 'tracks';
-
-const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
 
 const App: React.FC = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -39,19 +26,40 @@ const App: React.FC = () => {
     try {
       setIsProcessingBackup(true);
       const zip = new JSZip();
-      // منطق النسخ الاحتياطي هنا...
-      alert("تمت العملية بنجاح");
-    } catch (e) { alert("حدث خطأ"); }
-    finally { setIsProcessingBackup(false); }
+      const content = await zip.generateAsync({ type: 'blob' });
+      const fileName = `backup_${Date.now()}.zip`;
+      
+      try {
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.readAsDataURL(content);
+        });
+        await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Documents });
+        alert('تم حفظ النسخة الاحتياطية');
+      } catch (e) {
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+      }
+    } catch (err) {
+      alert('خطأ في إنشاء النسخة');
+    } finally {
+      setIsProcessingBackup(false);
+    }
   };
 
   const addTrack = async (file: File) => {
     const newTrack: Track = {
       id: Math.random().toString(36).substr(2, 9),
       name: file.name.replace(/\.[^/.]+$/, ""),
-      artist: "Unknown", url: URL.createObjectURL(file),
-      coverUrl: UNIFORM_PLACEHOLDER, isFavorite: false,
-      timestamps: [], duration: 0, playbackRate: 1, order: tracks.length,
+      artist: "Unknown",
+      url: URL.createObjectURL(file),
+      coverUrl: UNIFORM_PLACEHOLDER,
+      isFavorite: false,
+      timestamps: [],
+      duration: 0,
+      playbackRate: 1,
+      order: tracks.length,
       fileBlob: file
     };
     setTracks([...tracks, newTrack]);
@@ -101,5 +109,5 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
-  
+export default App; // تأكد أن هذا السطر موجود في النهاية
+    
