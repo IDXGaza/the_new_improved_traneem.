@@ -183,57 +183,7 @@ const App: React.FC = () => {
       const file = new File([content], fileName, { type: 'application/zip' });
 
       // ✅ دالة التحميل البديل - تم تعديلها للملفات الكبيرة
-      const fallbackDownload = () => {
-        const isLikelyWebView = /wv|Mobile|Android|iPhone/i.test(navigator.userAgent);
-        
-        // ✅ رفع الحد من 15MB إلى 500MB لدعم النسخ الكبيرة
-        if (isLikelyWebView && content.size < 500 * 1024 * 1024) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const a = document.createElement('a');
-            a.href = reader.result as string;
-            a.download = fileName;
-            a.textContent = 'اضغط هنا لتحميل النسخة الاحتياطية';
-            a.style.display = 'block';
-            a.style.padding = '20px';            a.style.background = '#4CAF50';
-            a.style.color = 'white';
-            a.style.textAlign = 'center';
-            a.style.borderRadius = '12px';
-            a.style.margin = '20px auto';
-            a.style.fontSize = '16px';
-            document.body.appendChild(a);
-            a.click();
-            
-            setTimeout(() => {
-              if (document.body.contains(a)) {
-                document.body.removeChild(a);
-              }
-              alert('✅ تم بدء التحميل! تحقق من مجلد التنزيلات في هاتفك');
-            }, 3000);
-          };
-          reader.readAsDataURL(content);
-        } else {
-          const url = URL.createObjectURL(content);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = fileName;
-          
-          alert(`📥 حجم النسخة: ${sizeMB} ميجابايت
-
-إذا لم يبدأ التحميل تلقائياً:
-1️⃣ اضغط مطولاً على زر التحميل
-2️⃣ اختر "تنزيل الرابط" أو "حفظ الملف"
-3️⃣ أو افتح الصفحة في متصفح كروم`);
-          
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-        }
-      };
-
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      
 const handleCreateBackup = async () => {
     try {
       setIsProcessingBackup(true);
