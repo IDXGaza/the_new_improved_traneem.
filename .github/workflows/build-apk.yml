@@ -29,8 +29,12 @@ jobs:
 
       - name: Add Capacitor
         run: |
-          npm install @capacitor/core@5 @capacitor/cli@5 @capacitor/android@5
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
           npx cap add android
+
+      - name: Fix Kotlin
+        run: |
+          sed -i 's/kotlin_version = .*/kotlin_version = "1.9.10"/' android/build.gradle
 
       - name: Build web app
         run: npm run build
