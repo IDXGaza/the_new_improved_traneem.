@@ -123,13 +123,12 @@ const App: React.FC = () => {
 const handleCreateBackup = async () => {
     try {
       setIsProcessingBackup(true);
-      alert('🔄 جارٍ تجهيز النسخة الاحتياطية...\nقد يستغرق هذا بضع دقائق للحجم الكبير.');
       
       const zip = new JSZip();
       const allTracks = await getAllTracksFromDB();
       
       if (allTracks.length === 0) {
-        alert('⚠️ لا توجد أناشيد لعمل نسخة احتياطية!');
+        console.log('لا توجد أناشيد');
         setIsProcessingBackup(false);
         return;
       }
@@ -194,11 +193,11 @@ const handleCreateBackup = async () => {
         text: `نسخة احتياطية (${sizeMB} MB) تحتوي على ${allTracks.length} أنشودة`,
       });
 
-      alert(`✅ تم إنشاء النسخة بنجاح!\n\n📁 من قائمة المشاركة، اختر:\n• حفظ في الملفات\n• أو أرسلها لنفسك على تيليجرام/واتساب\n• أو Google Drive`);
+      console.log('تم إنشاء النسخة');
 
     } catch (error: any) {
       console.error("❌ فشل إنشاء النسخة:", error);
-      alert(`❌ حدث خطأ أثناء إنشاء النسخة:\n${error.message}`);
+      console.error('فشل إنشاء النسخة');
     } finally {
       setIsProcessingBackup(false);
       setIsDropdownOpen(false);
