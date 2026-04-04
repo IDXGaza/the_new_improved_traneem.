@@ -189,7 +189,7 @@ const handleCreateBackup = async () => {
       console.log('📤 فتح قائمة المشاركة...');
       
       await Share.share({
-        files: [fileUri],
+        files: [fileUri.uri],
         title: 'نسخة احتياطية - ترانيم',
         text: `نسخة احتياطية (${sizeMB} MB) تحتوي على ${allTracks.length} أنشودة`,
       });
