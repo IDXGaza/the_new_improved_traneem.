@@ -119,71 +119,7 @@ const App: React.FC = () => {
   const currentTrack = currentTrackIndex !== null ? tracks[currentTrackIndex] : null;
 
   // ✅ الدالة المعدلة فقط (الباقي كما هو)
-  const handleCreateBackup = async () => {
-    try {
-      setIsProcessingBackup(true);
-      
-      // ✅ إشعار المستخدم أن العملية قد تطول
-      alert('🔄 جارٍ إنشاء النسخة الاحتياطية...\n📦 الحجم التقريبي: 313 ميجابايت\n⏱️ قد تستغرق 2-5 دقائق، يرجى الانتظار');
-      
-      const zip = new JSZip();
-      const allTracks = await getAllTracksFromDB();
-      
-      const metadataList = [];
-      
-      // ✅ إضافة مجلدات منظمة داخل ZIP
-      zip.folder('audio');
-      zip.folder('covers');
-      
-      console.log(`📊 بدء معالجة ${allTracks.length} أنشودة...`);
-      
-      for (let i = 0; i < allTracks.length; i++) {
-        const track = allTracks[i];
-        const trackMeta: any = { ...track };
-        
-        if (track.fileBlob) {
-          zip.file(`audio/${track.id}`, track.fileBlob);
-          delete trackMeta.fileBlob;
-        }
-        
-        if (track.coverBlob) {          zip.file(`covers/${track.id}`, track.coverBlob);
-          delete trackMeta.coverBlob;
-        }
-        
-        metadataList.push(trackMeta);
-        
-        // ✅ تحديث التقدم في الكونسول كل 10 ملفات
-        if (i % 10 === 0) {
-          console.log(`📦 تقدم: ${Math.round((i / allTracks.length) * 100)}%`);
-        }
-        
-        // ✅ إعطاء المتصفح وقت للتنفس لمنع التجميد (كل 20 ملف)
-        if (i % 20 === 0 && i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }
-      
-      zip.file('metadata.json', JSON.stringify(metadataList));
-      
-      console.log('🔄 جارٍ ضغط الملفات وإنشاء ZIP...');
-      
-      // ✅ إعدادات ضغط متوازنة بين السرعة والحجم
-      const content = await zip.generateAsync({ 
-        type: 'blob',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 6 },
-        streamFiles: true,
-        mimeType: 'application/zip',
-      });
-      
-      const sizeMB = (content.size / 1024 / 1024).toFixed(2);
-      console.log(`✅ تم إنشاء ZIP بنجاح، الحجم: ${sizeMB} MB`);
-      
-      const fileName = `traneem_backup_${new Date().toISOString().split('T')[0]}.zip`;
-      const file = new File([content], fileName, { type: 'application/zip' });
-
-      // ✅ دالة التحميل البديل - تم تعديلها للملفات الكبيرة
-      
+  
 const handleCreateBackup = async () => {
     try {
       setIsProcessingBackup(true);
