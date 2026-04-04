@@ -30,9 +30,7 @@ jobs:
       - name: Add Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap add android || true
-          echo "configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10' } }" >> android/build.gradle
-
+          npx cap add android
       - name: Build web app
         run: npm run build
 
