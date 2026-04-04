@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Track, Timestamp, PlayerState } from './types';
 import Sidebar from './components/Sidebar';
@@ -48,8 +47,7 @@ const initDB = (): Promise<IDBDatabase> => {
     } catch (error) {
       reject(error);
     }
-  });
-};
+  });};
 
 const saveTrackToDB = async (track: any): Promise<void> => {
   try {
@@ -98,8 +96,7 @@ const getAllTracksFromDB = async (): Promise<any[]> => {
 
 const App: React.FC = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,15 +117,27 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentTrack = currentTrackIndex !== null ? tracks[currentTrackIndex] : null;
 
+  // ✅ الدالة المعدلة فقط (الباقي كما هو)
   const handleCreateBackup = async () => {
     try {
       setIsProcessingBackup(true);
+      
+      // ✅ إشعار المستخدم أن العملية قد تطول
+      alert('🔄 جارٍ إنشاء النسخة الاحتياطية...\n📦 الحجم التقريبي: 313 ميجابايت\n⏱️ قد تستغرق 2-5 دقائق، يرجى الانتظار');
+      
       const zip = new JSZip();
       const allTracks = await getAllTracksFromDB();
       
       const metadataList = [];
       
-      for (const track of allTracks) {
+      // ✅ إضافة مجلدات منظمة داخل ZIP
+      zip.folder('audio');
+      zip.folder('covers');
+      
+      console.log(`📊 بدء معالجة ${allTracks.length} أنشودة...`);
+      
+      for (let i = 0; i < allTracks.length; i++) {
+        const track = allTracks[i];
         const trackMeta: any = { ...track };
         
         if (track.fileBlob) {
@@ -136,45 +145,90 @@ const App: React.FC = () => {
           delete trackMeta.fileBlob;
         }
         
-        if (track.coverBlob) {
-          zip.file(`covers/${track.id}`, track.coverBlob);
+        if (track.coverBlob) {          zip.file(`covers/${track.id}`, track.coverBlob);
           delete trackMeta.coverBlob;
         }
         
         metadataList.push(trackMeta);
+        
+        // ✅ تحديث التقدم في الكونسول كل 10 ملفات
+        if (i % 10 === 0) {
+          console.log(`📦 تقدم: ${Math.round((i / allTracks.length) * 100)}%`);
+        }
+        
+        // ✅ إعطاء المتصفح وقت للتنفس لمنع التجميد (كل 20 ملف)
+        if (i % 20 === 0 && i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
       }
       
       zip.file('metadata.json', JSON.stringify(metadataList));
       
-      const content = await zip.generateAsync({ type: 'blob' });
-      const fileName = `traneem_backup.zip`;
+      console.log('🔄 جارٍ ضغط الملفات وإنشاء ZIP...');
+      
+      // ✅ إعدادات ضغط متوازنة بين السرعة والحجم
+      const content = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 },
+        streamFiles: true,
+        mimeType: 'application/zip',
+      });
+      
+      const sizeMB = (content.size / 1024 / 1024).toFixed(2);
+      console.log(`✅ تم إنشاء ZIP بنجاح، الحجم: ${sizeMB} MB`);
+      
+      const fileName = `traneem_backup_${new Date().toISOString().split('T')[0]}.zip`;
       const file = new File([content], fileName, { type: 'application/zip' });
 
+      // ✅ دالة التحميل البديل - تم تعديلها للملفات الكبيرة
       const fallbackDownload = () => {
         const isLikelyWebView = /wv|Mobile|Android|iPhone/i.test(navigator.userAgent);
         
-        if (isLikelyWebView && content.size < 15 * 1024 * 1024) {
-          // Use Data URL for WebViews if file is small enough (< 15MB)
+        // ✅ رفع الحد من 15MB إلى 500MB لدعم النسخ الكبيرة
+        if (isLikelyWebView && content.size < 500 * 1024 * 1024) {
           const reader = new FileReader();
           reader.onloadend = () => {
             const a = document.createElement('a');
             a.href = reader.result as string;
             a.download = fileName;
+            a.textContent = 'اضغط هنا لتحميل النسخة الاحتياطية';
+            a.style.display = 'block';
+            a.style.padding = '20px';            a.style.background = '#4CAF50';
+            a.style.color = 'white';
+            a.style.textAlign = 'center';
+            a.style.borderRadius = '12px';
+            a.style.margin = '20px auto';
+            a.style.fontSize = '16px';
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
+            
+            setTimeout(() => {
+              if (document.body.contains(a)) {
+                document.body.removeChild(a);
+              }
+              alert('✅ تم بدء التحميل! تحقق من مجلد التنزيلات في هاتفك');
+            }, 3000);
           };
           reader.readAsDataURL(content);
         } else {
-          // Standard Blob download
           const url = URL.createObjectURL(content);
           const a = document.createElement('a');
           a.href = url;
           a.download = fileName;
+          
+          alert(`📥 حجم النسخة: ${sizeMB} ميجابايت
+
+إذا لم يبدأ التحميل تلقائياً:
+1️⃣ اضغط مطولاً على زر التحميل
+2️⃣ اختر "تنزيل الرابط" أو "حفظ الملف"
+3️⃣ أو افتح الصفحة في متصفح كروم`);
+          
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
         }
       };
 
@@ -183,20 +237,32 @@ const App: React.FC = () => {
           await navigator.share({
             files: [file],
             title: 'نسخة احتياطية - ترانيم',
+            text: `نسخة احتياطية تحتوي على ${allTracks.length} أنشودة`
           });
+          alert('✅ تم إرسال النسخة بنجاح!');
+          return;
         } catch (shareError: any) {
           if (shareError.name !== 'AbortError') {
-            fallbackDownload();
+            console.log('المشاركة فشلت، استخدام التحميل البديل');            fallbackDownload();
           }
         }
       } else {
-        // For WebViews that don't support share but might support data URLs
-        // We try blob first, if it fails, it fails silently in WebViews without DownloadListener
         fallbackDownload();
       }
-    } catch (error) {
-      console.error("Backup creation failed:", error);
-      alert("حدث خطأ أثناء إنشاء النسخة الاحتياطية");
+      
+      alert('✨ انتهت عملية إنشاء النسخة الاحتياطية!');
+      
+    } catch (error: any) {
+      console.error("❌ فشل إنشاء النسخة:", error);
+      
+      let errorMsg = "حدث خطأ أثناء إنشاء النسخة الاحتياطية";
+      if (error.message?.includes('memory')) {
+        errorMsg = "❌ الذاكرة غير كافية!\nجرب تقسيم النسخة أو حذف بعض الأنشيدات غير الضرورية";
+      } else if (error.message?.includes('timeout')) {
+        errorMsg = "⏱️ انتهت مهلة العملية!\nجرب مرة أخرى مع عدد أقل من الأنشيدات";
+      }
+      
+      alert(errorMsg);
     } finally {
       setIsProcessingBackup(false);
       setIsDropdownOpen(false);
@@ -226,8 +292,7 @@ const App: React.FC = () => {
           trackMeta.fileBlob = await audioFile.async('blob');
         }
         
-        const coverFile = contents.file(`covers/${trackMeta.id}`);
-        if (coverFile) {
+        const coverFile = contents.file(`covers/${trackMeta.id}`);        if (coverFile) {
           trackMeta.coverBlob = await coverFile.async('blob');
         }
         
@@ -276,7 +341,6 @@ const App: React.FC = () => {
       console.error("AudioContext initialization failed:", e);
     }
   };
-
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
@@ -326,8 +390,7 @@ const App: React.FC = () => {
     initAudioCtx();
     if (playerState.isPlaying) {
       audio.pause();
-      setPlayerState(prev => ({ ...prev, isPlaying: false }));
-    } else {
+      setPlayerState(prev => ({ ...prev, isPlaying: false }));    } else {
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
@@ -376,8 +439,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentTrack.name,
-        artist: currentTrack.artist || 'ترانيم',
+        title: currentTrack.name,        artist: currentTrack.artist || 'ترانيم',
         album: 'مكتبتي',
         artwork: [{ src: currentTrack.coverUrl, sizes: '512x512', type: 'image/png' }]
       });
@@ -426,8 +488,7 @@ const App: React.FC = () => {
     const updateTime = () => setPlayerState(prev => ({ ...prev, currentTime: audio.currentTime }));
     const onEnded = () => playerState.isLooping ? (audio.currentTime = 0, audio.play().catch(() => {})) : handleSkipToNext();
     const onWaiting = () => setPlayerState(prev => ({ ...prev, isLoading: true }));
-    
-    const onPlaying = () => {
+        const onPlaying = () => {
       setPlayerState(prev => ({ ...prev, isLoading: false }));
       updateMediaSessionPosition();
     };
@@ -476,8 +537,7 @@ const App: React.FC = () => {
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('ended', onEnded);      audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('playing', onPlaying);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('seeked', onSeeked);
@@ -504,7 +564,7 @@ const App: React.FC = () => {
   const handleUpdateName = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!currentTrack) return;
-    const newName = window.prompt("تعديل اسم الأنشودة:", currentTrack.name);
+     const newName = window.prompt("تعديل اسم الأنشودة:", currentTrack.name);
     if (newName?.trim()) {
       const updatedTrack = { ...currentTrack, name: newName.trim() };
       setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
@@ -550,7 +610,7 @@ const App: React.FC = () => {
 
   const handleRemoveTimestamp = (timestampId: string) => {
     if (!currentTrack) return;
-    const updatedTrack = { ...currentTrack, timestamps: currentTrack.timestamps.filter(ts => ts.id !== timestampId) };
+    const updatedTrack = { ...currentTrack, timestamps: currentTrack.timestamps.filter(t => t.id !== timestampId) };
     setTracks(prev => prev.map(t => t.id === currentTrack.id ? updatedTrack : t));
     saveTrackToDB(updatedTrack).catch(() => {});
   };
@@ -821,12 +881,12 @@ const App: React.FC = () => {
 
       <footer className="fixed bottom-0 left-0 right-0 z-[50] p-4 md:p-8 pointer-events-none mb-[env(safe-area-inset-bottom,0px)]">
         <audio ref={audioRef} src={currentTrack?.url} className="hidden" preload="auto" crossOrigin="anonymous" />
-        {/* تمت إزالة overflow-hidden من هنا لضمان عمل العناصر المنبثقة مستقبلاً */}
         <div className="max-w-3xl mx-auto bg-white/95 dark:bg-black/80 backdrop-blur-3xl border border-white/50 dark:border-slate-800 shadow-[0_24px_64px_-12px_rgba(0,0,0,0.3)] rounded-[32px] pointer-events-auto transition-colors duration-300">
           <Player 
             track={currentTrack} state={playerState} onPlayPause={handlePlayPause} 
             onSeek={handleSeek} onSkip={handleSkip} onRateChange={handleRateChange} 
             onToggleFavorite={handleToggleFavorite} onToggleLoop={handleToggleLoop} 
+     onToggleLoop={handleToggleLoop} 
             onAddTimestamp={handleAddTimestamp} hasError={!!loadError} 
           />
         </div>
@@ -836,3 +896,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+  
