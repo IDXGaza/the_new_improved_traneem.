@@ -955,7 +955,6 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result as string;
-      // إزالة الـ "application/zip;base64," من البداية
       const base64 = result.split(',')[1];
       resolve(base64);
     };
