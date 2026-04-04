@@ -172,13 +172,21 @@ const handleCreateBackup = async () => {
 
       console.log('💾 حفظ الملف في ذاكرة التطبيق...');
       
-      const base64Data = await blobToBase64(content);
       
-      await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.Data,
-      });
+const arrayBuffer = await content.arrayBuffer();
+const uint8Array = new Uint8Array(arrayBuffer);
+let binary = '';
+const chunkSize = 8192;
+for (let i = 0; i < uint8Array.length; i += chunkSize) {
+  binary += String.fromCharCode(...uint8Array.subarray(i, i + chunkSize));
+}
+const base64Data = btoa(binary);
+
+await Filesystem.writeFile({
+  path: fileName,
+  data: base64Data,
+  directory: Directory.Data,
+});
 
       const fileUri = await Filesystem.getUri({
         path: fileName,
