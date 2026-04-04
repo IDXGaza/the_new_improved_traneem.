@@ -123,7 +123,11 @@ const App: React.FC = () => {
 const handleCreateBackup = async () => {
     try {
       setIsProcessingBackup(true);
-      
+      const permission = await Filesystem.requestPermissions();
+if (permission.publicStorage !== 'granted') {
+  setIsProcessingBackup(false);
+  return;
+}
       const zip = new JSZip();
       const allTracks = await getAllTracksFromDB();
       
