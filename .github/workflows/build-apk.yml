@@ -30,18 +30,22 @@ jobs:
       - name: Add Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          rm -rf android
           npx cap add android
+
       - name: Build web app
         run: npm run build
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Add Capacitor
+      - name: Build APK
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap add android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug -x checkDebugDuplicateClasses
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
