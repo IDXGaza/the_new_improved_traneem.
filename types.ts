@@ -1,25 +1,20 @@
-
 export interface Timestamp {
   id: string;
-  userId?: string;
   time: number;
   label: string;
 }
 
 export interface Track {
   id: string;
-  userId?: string;
   name: string;
   artist: string;
-  url: string; // Local blob URL
-  audioUrl?: string; // Firebase Storage URL
+  url: string;
   coverUrl: string;
-  coverStorageUrl?: string; // Firebase Storage URL for cover
   isFavorite: boolean;
   timestamps: Timestamp[];
   duration: number;
   playbackRate: number;
-  order: number;
+  order: number; // أضفنا هذا السطر لحل خطأ الصورة
   fileBlob?: File | Blob;
   coverBlob?: File | Blob;
 }
