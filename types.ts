@@ -14,7 +14,7 @@ export interface Track {
   timestamps: Timestamp[];
   duration: number;
   playbackRate: number;
-  order: number; // أضفنا هذا السطر لحل خطأ الصورة
+  order: number; 
   fileBlob?: File | Blob;
   coverBlob?: File | Blob;
 }
