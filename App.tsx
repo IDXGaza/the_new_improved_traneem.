@@ -886,7 +886,6 @@ const App: React.FC = () => {
             track={currentTrack} state={playerState} onPlayPause={handlePlayPause} 
             onSeek={handleSeek} onSkip={handleSkip} onRateChange={handleRateChange} 
             onToggleFavorite={handleToggleFavorite} onToggleLoop={handleToggleLoop} 
-     onToggleLoop={handleToggleLoop} 
             onAddTimestamp={handleAddTimestamp} hasError={!!loadError} 
           />
         </div>
@@ -896,4 +895,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-  
