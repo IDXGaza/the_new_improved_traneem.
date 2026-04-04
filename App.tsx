@@ -22,13 +22,13 @@ const initDB = (): Promise<IDBDatabase> => {
   });
 };
 
-const saveTrackToDB = async (track: any) => {
+const saveTrackToDB = async (track: Track) => {
   const db = await initDB();
   const tx = db.transaction(STORE_NAME, 'readwrite');
   tx.objectStore(STORE_NAME).put(track);
 };
 
-const getAllTracksFromDB = async (): Promise<any[]> => {
+const getAllTracksFromDB = async (): Promise<Track[]> => {
   const db = await initDB();
   return new Promise((resolve) => {
     const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll();
@@ -53,10 +53,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     getAllTracksFromDB().then(saved => {
-      const formatted = saved.map(t => ({
+      const sorted = saved.sort((a, b) => (a.order || 0) - (b.order || 0));
+      const formatted = sorted.map(t => ({
         ...t,
-        url: t.fileBlob ? URL.createObjectURL(t.fileBlob) : (t.audioUrl || ""),
-        coverUrl: t.coverBlob ? URL.createObjectURL(t.coverBlob) : (t.coverUrl || UNIFORM_PLACEHOLDER)
+        url: t.fileBlob ? URL.createObjectURL(t.fileBlob) : t.url,
+        coverUrl: t.coverBlob ? URL.createObjectURL(t.coverBlob) : t.coverUrl
       }));
       setTracks(formatted);
       if (formatted.length > 0) setCurrentTrackIndex(0);
@@ -72,27 +73,20 @@ const App: React.FC = () => {
         const meta = { ...t };
         if (t.fileBlob) zip.file(`audio/${t.id}`, t.fileBlob);
         if (t.coverBlob) zip.file(`covers/${t.id}`, t.coverBlob);
-        delete meta.fileBlob; delete meta.coverBlob;
         return meta;
       });
       zip.file('metadata.json', JSON.stringify(metadata));
       const content = await zip.generateAsync({ type: 'blob' });
       const fileName = `traneem_backup_${Date.now()}.zip`;
 
-      try {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve) => {
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-          reader.readAsDataURL(content);
-        });
-        await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Documents });
-        alert('تم حفظ النسخة في Documents');
-        return;
-      } catch (e) {
-        const url = URL.createObjectURL(content);
-        const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
-      }
-    } catch (error) { alert("خطأ في النسخ الاحتياطي"); }
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(content);
+      });
+      await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Documents });
+      alert('تم الحفظ بنجاح');
+    } catch (e) { alert("فشل الحفظ، تأكد من تثبيت Capacitor Filesystem"); }
     finally { setIsProcessingBackup(false); }
   };
 
@@ -100,59 +94,70 @@ const App: React.FC = () => {
     const newTrack: Track = {
       id: Math.random().toString(36).substr(2, 9),
       name: file.name.replace(/\.[^/.]+$/, ""),
-      artist: "", url: URL.createObjectURL(file), coverUrl: UNIFORM_PLACEHOLDER,
-      isFavorite: false, timestamps: [], duration: 0, playbackRate: 1, fileBlob: file
+      artist: "فنان غير معروف",
+      url: URL.createObjectURL(file),
+      coverUrl: UNIFORM_PLACEHOLDER,
+      isFavorite: false,
+      timestamps: [],
+      duration: 0,
+      playbackRate: 1,
+      order: tracks.length, // حل مشكلة الـ order
+      fileBlob: file
     };
-    setTracks([...tracks, newTrack]);
-    saveTrackToDB(newTrack);
+    const updatedTracks = [...tracks, newTrack];
+    setTracks(updatedTracks);
+    await saveTrackToDB(newTrack);
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
       <Sidebar 
-        isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}
-        tracks={tracks} currentTrackIndex={currentTrackIndex}
-        onSelectTrack={(i) => { setCurrentTrackIndex(i); setPlayerState({...playerState, isPlaying: true}); }}
-        onAddTrack={addTrack} isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        isDropdownOpen={isDropdownOpen} setIsDropdownOpen={setIsDropdownOpen}
-        handleCreateBackup={handleCreateBackup} isProcessingBackup={isProcessingBackup}
-        fileInputRef={fileInputRef} onDeleteTrack={(id: string) => setTracks(tracks.filter(t => t.id !== id))}
-        handleRestoreBackup={() => {}} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)}
+        tracks={tracks}
+        onSelectTrack={(i: number) => setCurrentTrackIndex(i)}
+        onAddTrack={addTrack}
+        isDarkMode={isDarkMode}
+        toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        handleCreateBackup={handleCreateBackup}
+        isProcessingBackup={isProcessingBackup}
       />
-      <main className="pb-32 pt-4 px-4 max-w-4xl mx-auto">
-        <button onClick={() => setIsSidebarOpen(true)} className="p-2 mb-4">☰</button>
+
+      <main className="max-w-4xl mx-auto p-4">
+        <button onClick={() => setIsSidebarOpen(true)} className="p-4 text-2xl">☰</button>
         {currentTrack && (
           <div className="text-center">
-            <img src={currentTrack.coverUrl} className="w-64 h-64 mx-auto rounded-3xl object-cover shadow-2xl mb-6" />
-            <h2 className="text-3xl font-bold mb-2">{currentTrack.name}</h2>
+            <img src={currentTrack.coverUrl} className="w-64 h-64 mx-auto rounded-xl shadow-lg" />
+            <h2 className="text-2xl font-bold mt-4">{currentTrack.name}</h2>
             <TimestampManager 
-              timestamps={currentTrack.timestamps} currentTime={playerState.currentTime}
-              onSeek={(t) => { if(audioRef.current) audioRef.current.currentTime = t; }}
-              onAdd={() => {}} onRemove={(id: string) => {}}
+              timestamps={currentTrack.timestamps}
+              currentTime={playerState.currentTime}
+              onSeek={(t: number) => { if(audioRef.current) audioRef.current.currentTime = t; }}
             />
           </div>
         )}
       </main>
+
       {currentTrack && (
         <Player 
-          track={currentTrack} playerState={playerState} 
-          onPlayPause={() => {
-            if (playerState.isPlaying) audioRef.current?.pause();
-            else audioRef.current?.play();
-            setPlayerState({...playerState, isPlaying: !playerState.isPlaying});
-          }}
-          onSeek={(t) => { if(audioRef.current) audioRef.current.currentTime = t; }}
-          onNext={() => {}} onPrevious={() => {}} onToggleLoop={() => {}}
-          onRateChange={() => {}} onToggleFavorite={() => {}} audioRef={audioRef}
+          track={currentTrack}
+          onPlayPause={() => playerState.isPlaying ? audioRef.current?.pause() : audioRef.current?.play()}
+          isPlaying={playerState.isPlaying}
+          currentTime={playerState.currentTime}
+          onSeek={(t: number) => { if(audioRef.current) audioRef.current.currentTime = t; }}
         />
       )}
+
       <audio 
-        ref={audioRef} src={currentTrack?.url} 
-        onTimeUpdate={() => setPlayerState(prev => ({...prev, currentTime: audioRef.current?.currentTime || 0}))} 
+        ref={audioRef}
+        src={currentTrack?.url}
+        onPlay={() => setPlayerState({...playerState, isPlaying: true})}
+        onPause={() => setPlayerState({...playerState, isPlaying: false})}
+        onTimeUpdate={() => setPlayerState({...playerState, currentTime: audioRef.current?.currentTime || 0})}
       />
     </div>
   );
 };
 
 export default App;
-          
+                     
