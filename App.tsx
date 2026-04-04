@@ -234,42 +234,95 @@ const App: React.FC = () => {
       };
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: 'نسخة احتياطية - ترانيم',
-            text: `نسخة احتياطية تحتوي على ${allTracks.length} أنشودة`
-          });
-          alert('✅ تم إرسال النسخة بنجاح!');
-          return;
-        } catch (shareError: any) {
-          if (shareError.name !== 'AbortError') {
-            console.log('المشاركة فشلت، استخدام التحميل البديل');            fallbackDownload();
-          }
-        }
-      } else {
-        fallbackDownload();
+const handleCreateBackup = async () => {
+    try {
+      setIsProcessingBackup(true);
+      alert('🔄 جارٍ تجهيز النسخة الاحتياطية...\nقد يستغرق هذا بضع دقائق للحجم الكبير.');
+      
+      const zip = new JSZip();
+      const allTracks = await getAllTracksFromDB();
+      
+      if (allTracks.length === 0) {
+        alert('⚠️ لا توجد أناشيد لعمل نسخة احتياطية!');
+        setIsProcessingBackup(false);
+        return;
       }
+
+      const metadataList = [];
+      console.log(`📊 بدء معالجة ${allTracks.length} أنشودة...`);
+
+      for (let i = 0; i < allTracks.length; i++) {
+        const track = allTracks[i];
+        const trackMeta: any = { ...track };
+        
+        if (track.fileBlob) {
+          zip.file(`audio/${track.id}`, track.fileBlob);
+          delete trackMeta.fileBlob;
+        }
+        if (track.coverBlob) {
+          zip.file(`covers/${track.id}`, track.coverBlob);
+          delete trackMeta.coverBlob;
+        }
+        metadataList.push(trackMeta);
+
+        // منع التعليق مع الملفات الكبيرة
+        if (i % 20 === 0 && i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+
+      zip.file('metadata.json', JSON.stringify(metadataList));
+      console.log('🔄 جارٍ ضغط الملفات...');
       
-      alert('✨ انتهت عملية إنشاء النسخة الاحتياطية!');
+      const content = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 1 }, // سرعة أعلى
+        streamFiles: true,
+        mimeType: 'application/zip',
+      });
+
+      const sizeMB = (content.size / 1024 / 1024).toFixed(2);
+      console.log(`✅ تم إنشاء ZIP، الحجم: ${sizeMB} MB`);    
+      const fileName = `traneem_backup_${Date.now()}.zip`;
+
+      // ✅ حفظ الملف في ذاكرة التطبيق (مسموح دائماً في أندرويد)
+      console.log('💾 حفظ الملف في ذاكرة التطبيق...');
       
+      // تحويل Blob إلى Base64 لـ Capacitor
+      const base64Data = await blobToBase64(content);
+      
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Data,
+      });
+
+      // الحصول على رابط الملف
+      const fileUri = await Filesystem.getUri({
+        path: fileName,
+        directory: Directory.Data,
+      });
+
+      console.log('📤 فتح قائمة المشاركة...');
+      
+      // فتح قائمة المشاركة في أندرويد
+      await Share.share({
+        files: [fileUri],
+        title: 'نسخة احتياطية - ترانيم',
+        text: `نسخة احتياطية (${sizeMB} MB) تحتوي على ${allTracks.length} أنشودة`,
+      });
+
+      alert(`✅ تم إنشاء النسخة بنجاح!\n\n📁 من قائمة المشاركة، اختر:\n• حفظ في الملفات (Save to Files)\n• أو أرسلها لنفسك على تيليجرام/واتساب\n• أو Google Drive`);
+
     } catch (error: any) {
       console.error("❌ فشل إنشاء النسخة:", error);
-      
-      let errorMsg = "حدث خطأ أثناء إنشاء النسخة الاحتياطية";
-      if (error.message?.includes('memory')) {
-        errorMsg = "❌ الذاكرة غير كافية!\nجرب تقسيم النسخة أو حذف بعض الأنشيدات غير الضرورية";
-      } else if (error.message?.includes('timeout')) {
-        errorMsg = "⏱️ انتهت مهلة العملية!\nجرب مرة أخرى مع عدد أقل من الأنشيدات";
-      }
-      
-      alert(errorMsg);
+      alert(`❌ حدث خطأ أثناء إنشاء النسخة:\n${error.message}\n\nراجع Console للمزيد من التفاصيل`);
     } finally {
       setIsProcessingBackup(false);
       setIsDropdownOpen(false);
     }
   };
-
   const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -896,3 +949,17 @@ const App: React.FC = () => {
 };
 
 export default App;
+// دالة مساعدة لتحويل Blob إلى Base64
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      // إزالة الـ "application/zip;base64," من البداية
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
