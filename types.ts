@@ -17,6 +17,7 @@ export interface Track {
   order: number; 
   fileBlob?: File | Blob;
   coverBlob?: File | Blob;
+  audioUrl?: string;
 }
 
 export interface PlayerState {
