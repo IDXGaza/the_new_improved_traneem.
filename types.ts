@@ -18,6 +18,7 @@ export interface Track {
   fileBlob?: File | Blob;
   coverBlob?: File | Blob;
   audioUrl?: string;
+  filePath?: string;
 }
 
 export interface PlayerState {
