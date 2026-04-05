@@ -44,11 +44,12 @@ jobs:
           
           import android.os.Bundle
           import com.getcapacitor.BridgeActivity
+          import com.idxgaza.traneem.BackupPlugin
           
           class MainActivity : BridgeActivity() {
               override fun onCreate(savedInstanceState: Bundle?) {
-                  registerPlugin(BackupPlugin::class.java)
                   super.onCreate(savedInstanceState)
+                  registerPlugin(BackupPlugin::class.java)
               }
           }
           EOF
