@@ -36,6 +36,21 @@ jobs:
         run: |
           mkdir -p android/app/src/main/java/com/idxgaza/traneem/
           cp android-plugins/BackupPlugin.kt android/app/src/main/java/com/idxgaza/traneem/
+          - name: Register Plugin
+        run: |
+          cat > android/app/src/main/java/com/idxgaza/traneem/MainActivity.kt << 'EOF'
+          package com.idxgaza.traneem
+          
+          import android.os.Bundle
+          import com.getcapacitor.BridgeActivity
+          
+          class MainActivity : BridgeActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  registerPlugin(BackupPlugin::class.java)
+                  super.onCreate(savedInstanceState)
+              }
+          }
+          EOF
       - name: Build web app
         run: npm run build
 
