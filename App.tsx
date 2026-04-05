@@ -123,87 +123,44 @@ const App: React.FC = () => {
 const handleCreateBackup = async () => {
     try {
       setIsProcessingBackup(true);
-      const permission = await Filesystem.requestPermissions();
-if (permission.publicStorage !== 'granted') {
-  setIsProcessingBackup(false);
-  return;
-}
-      const zip = new JSZip();
       const allTracks = await getAllTracksFromDB();
       
       if (allTracks.length === 0) {
         console.log('لا توجد أناشيد');
-        setIsProcessingBackup(false);
         return;
       }
 
-      const metadataList = [];
-      console.log(`📊 بدء معالجة ${allTracks.length} أنشودة...`);
+      const files = allTracks
+        .filter(t => t.filePath)
+        .map(t => ({ name: `audio/${t.id}`, path: t.filePath }));
 
-      for (let i = 0; i < allTracks.length; i++) {
-        const track = allTracks[i];
-        const trackMeta: any = { ...track };
-        
-        if (track.fileBlob) {
-          zip.file(`audio/${track.id}`, track.fileBlob);
-          delete trackMeta.fileBlob;
-        }
-        if (track.coverBlob) {
-          zip.file(`covers/${track.id}`, track.coverBlob);
-          delete trackMeta.coverBlob;
-        }
-        metadataList.push(trackMeta);
+      const metadata = JSON.stringify(allTracks.map(t => {
+        const { fileBlob, ...rest } = t;
+        return rest;
+      }));
 
-        if (i % 20 === 0 && i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }
-
-      zip.file('metadata.json', JSON.stringify(metadataList));
-      console.log('🔄 جارٍ ضغط الملفات...');
-      
-      const content = await zip.generateAsync({ 
-        type: 'blob',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 1 },
-        streamFiles: true,
-        mimeType: 'application/zip',
-      });
-
-      const sizeMB = (content.size / 1024 / 1024).toFixed(2);
-      console.log(`✅ تم إنشاء ZIP، الحجم: ${sizeMB} MB`);    
-      const fileName = `traneem_backup_${Date.now()}.zip`;
-
-      console.log('💾 حفظ الملف في ذاكرة التطبيق...');
-      
-      
-const arrayBuffer = await content.arrayBuffer();
-const uint8Array = new Uint8Array(arrayBuffer);
-let binary = '';
-const chunkSize = 8192;
-for (let i = 0; i < uint8Array.length; i += chunkSize) {
-  binary += String.fromCharCode(...uint8Array.subarray(i, i + chunkSize));
-}
-const base64Data = btoa(binary);
-
-await Filesystem.writeFile({
-  path: fileName,
-  data: base64Data,
-  directory: Directory.Data,
-});
-
-      const fileUri = await Filesystem.getUri({
-        path: fileName,
+      await Filesystem.writeFile({
+        path: 'metadata.json',
+        data: btoa(unescape(encodeURIComponent(metadata))),
         directory: Directory.Data,
       });
 
-      console.log('📤 فتح قائمة المشاركة...');
+      files.push({ name: 'metadata.json', path: 'metadata.json' });
+
+      const { path } = await (BackupPlugin as any).createBackup({ files });
       
       await Share.share({
-        files: [fileUri.uri],
+        files: [path],
         title: 'نسخة احتياطية - ترانيم',
-        text: `نسخة احتياطية (${sizeMB} MB) تحتوي على ${allTracks.length} أنشودة`,
       });
+
+    } catch (error: any) {
+      console.error("فشل إنشاء النسخة:", error);
+    } finally {
+      setIsProcessingBackup(false);
+      setIsDropdownOpen(false);
+    }
+  };
 
       console.log('تم إنشاء النسخة');
 
