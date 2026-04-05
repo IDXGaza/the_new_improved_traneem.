@@ -167,13 +167,7 @@ const handleCreateBackup = async () => {
       console.log('تم إنشاء النسخة');
 
     } catch (error: any) {
-      console.error("❌ فشل إنشاء النسخة:", error);
-      console.error('فشل إنشاء النسخة');
-    } finally {
-      setIsProcessingBackup(false);
-      setIsDropdownOpen(false);
-    }
-  };
+
   const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
