@@ -545,7 +545,6 @@ const addTrack = async (file: File) => {
       console.error("Failed to add track:", error);
     }
   };
-  };
 
   const removeTrack = async (id: string) => {
     try {
