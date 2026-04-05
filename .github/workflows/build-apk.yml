@@ -39,20 +39,20 @@ jobs:
 
       - name: Register Plugin
         run: |
-          cat > android/app/src/main/java/com/idxgaza/traneem/MainActivity.kt << 'EOF'
-          package com.idxgaza.traneem
-          
-          import android.os.Bundle
-          import com.getcapacitor.BridgeActivity
-          import com.idxgaza.traneem.BackupPlugin
-          
-          class MainActivity : BridgeActivity() {
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  registerPlugin(BackupPlugin::class.java)
-              }
-          }
-          EOF
+          mkdir -p android/app/src/main/java/com/idxgaza/traneem
+          printf '%s\n' \
+            'package com.idxgaza.traneem' \
+            '' \
+            'import android.os.Bundle' \
+            'import com.getcapacitor.BridgeActivity' \
+            'import com.idxgaza.traneem.BackupPlugin' \
+            '' \
+            'class MainActivity : BridgeActivity() {' \
+            '    override fun onCreate(savedInstanceState: Bundle?) {' \
+            '        super.onCreate(savedInstanceState)' \
+            '        registerPlugin(BackupPlugin::class.java)' \
+            '    }' \
+            '}' > android/app/src/main/java/com/idxgaza/traneem/MainActivity.kt
       - name: Build web app
         run: npm run build
 
