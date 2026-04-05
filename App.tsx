@@ -158,6 +158,7 @@ const handleCreateBackup = async () => {
 
     } catch (error: any) {
       console.error("فشل إنشاء النسخة:", error);
+window.alert('خطأ: ' + (error?.message || JSON.stringify(error)));
     } finally {
       setIsProcessingBackup(false);
       setIsDropdownOpen(false);
