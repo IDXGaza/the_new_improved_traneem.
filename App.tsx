@@ -163,11 +163,6 @@ const handleCreateBackup = async () => {
       setIsDropdownOpen(false);
     }
   };
-
-      console.log('تم إنشاء النسخة');
-
-    } catch (error: any) {
-
   const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
