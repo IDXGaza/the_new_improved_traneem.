@@ -15,7 +15,7 @@
     "@google/genai": "^1.40.0",
     "jszip": "^3.10.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
     "vite-plugin-pwa": "^0.20.0"
   },
   "devDependencies": {
